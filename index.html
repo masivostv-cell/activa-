@@ -32,6 +32,7 @@
             height: 0;
             overflow: hidden;
             border-radius: 1.5rem;
+            background: #000;
         }
 
         .video-container iframe {
@@ -40,6 +41,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            border: 0;
         }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -77,10 +79,10 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-0 sm:p-4">
+<body class="min-h-screen flex items-center justify-center p-0 sm:p-4 text-white">
 
     <div id="app-container" class="w-full max-w-md h-screen sm:h-[800px] app-bg sm:rounded-[3rem] overflow-hidden shadow-2xl flex flex-col relative border border-slate-800">
-        <!-- Renderizado dinámico -->
+        <!-- Contenido Dinámico -->
     </div>
 
     <script type="module">
@@ -116,10 +118,11 @@
             }
         };
 
+        // URLs de YouTube estándar para máxima compatibilidad
         const moduleData = {
             actividad: {
                 title: "Actividad Física",
-                video: "https://www.youtube.com/embed/6i_9O86Y-Yw",
+                video: "https://www.youtube.com/embed/40wofiD9p_A",
                 icon: "zap",
                 color: "from-orange-500 to-red-500",
                 tips: ["Mejora la resistencia física.", "Fortalece tus huesos.", "Reduce el estrés.", "Mínimo 60 min al día."],
@@ -127,7 +130,7 @@
             },
             comida: {
                 title: "Alimentación Saludable",
-                video: "https://www.youtube.com/embed/3nIAsD6tX6U",
+                video: "https://www.youtube.com/embed/bnmUouTftX0",
                 icon: "apple",
                 color: "from-red-500 to-pink-500",
                 tips: ["Plato colorido (arcoíris).", "Evita ultraprocesados.", "Frutas como snack.", "La fibra es tu aliada."],
@@ -135,7 +138,7 @@
             },
             agua: {
                 title: "Hidratación",
-                video: "https://www.youtube.com/embed/ZidGoz9fOls",
+                video: "https://www.youtube.com/embed/b7AAHNUTK7U",
                 icon: "droplet",
                 color: "from-blue-500 to-cyan-500",
                 tips: ["Mantiene el cerebro enfocado.", "No esperes a tener sed.", "Evita gaseosas.", "Meta: 8 vasos diarios."],
@@ -143,7 +146,7 @@
             },
             descanso: {
                 title: "Descanso",
-                video: "https://www.youtube.com/embed/6_6p9Z6U1iM",
+                video: "https://www.youtube.com/embed/LsMUYy8KUbc",
                 icon: "moon",
                 color: "from-purple-500 to-indigo-500",
                 tips: ["Mejora la memoria.", "Apaga pantallas antes de dormir.", "Crecimiento nocturno.", "Duerma 8-10 horas."],
@@ -195,10 +198,10 @@
             await setDoc(doc(db, 'artifacts', appId, 'users', window.state.user.uid, 'data', 'profile'), newProfile);
         };
 
-        const getAuthorFooter = () => `
-            <div class="author-footer">
+        const getAuthorFooter = (isLight = false) => `
+            <div class="author-footer" style="${isLight ? 'color: rgba(0,0,0,0.3)' : ''}">
                 <div class="flex items-center gap-1 opacity-50">
-                    <i data-lucide="activity" class="w-3 h-3 text-green-500"></i>
+                    <i data-lucide="activity" class="w-3 h-3 ${isLight ? 'text-green-600' : 'text-green-500'}"></i>
                     <span class="font-black tracking-widest uppercase" style="font-size: 8px;">ACTIVA+</span>
                 </div>
                 <p>Daniela Contreras & Gabriela Vega</p>
@@ -223,11 +226,11 @@
             else if (window.state.screen === 'loading') {
                 container.innerHTML = `
                     <div class="flex-1 flex flex-col items-center justify-center p-8 bg-slate-900">
-                        <div class="animate-bounce w-20 h-20 bg-green-500 rounded-3xl flex items-center justify-center shadow-2xl mb-6">
-                            <i data-lucide="activity" class="text-white w-10 h-10"></i>
+                        <div class="animate-bounce w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl mb-6">
+                            <i data-lucide="activity" class="text-green-500 w-10 h-10"></i>
                         </div>
-                        <h1 class="text-3xl font-black mb-4 tracking-tighter">ACTIVA+</h1>
-                        <div class="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <h1 class="text-3xl font-black mb-4 tracking-tighter uppercase">ACTIVA+</h1>
+                        <div class="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden mb-12">
                             <div class="h-full bg-green-500 animate-progress"></div>
                         </div>
                         <div class="absolute bottom-4 w-full">
@@ -240,8 +243,8 @@
             else if (window.state.screen === 'onboarding') {
                 container.innerHTML = `
                     <div class="flex-1 flex flex-col p-8 bg-white text-slate-900 overflow-y-auto no-scrollbar">
-                        <h2 class="text-4xl font-black mb-2">¡Hola!<br>Explorador</h2>
-                        <p class="text-slate-500 mb-8 font-medium">Hagamos tu diagnóstico inicial.</p>
+                        <h2 class="text-4xl font-black mb-2 leading-tight">¡Hola!<br>Explorador</h2>
+                        <p class="text-slate-500 mb-8 font-medium">Hagamos tu diagnóstico inicial de salud.</p>
                         <div class="space-y-6 mb-12">
                             <input id="ob-name" type="text" placeholder="¿Cómo te llamas?" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-green-500">
                             <div class="flex gap-4">
@@ -249,15 +252,9 @@
                                 <input id="ob-target" type="number" placeholder="Meta kg" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-green-500">
                             </div>
                         </div>
-                        <button onclick="handleStart()" class="w-full bg-green-600 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all">COMENZAR AVENTURA</button>
+                        <button onclick="handleStart()" class="w-full bg-green-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-green-600/20 active:scale-95 transition-all">COMENZAR AVENTURA</button>
                         <div class="mt-8">
-                             <div class="author-footer" style="color: rgba(0,0,0,0.2)">
-                                <div class="flex items-center gap-1 opacity-50">
-                                    <i data-lucide="activity" class="w-3 h-3 text-green-600"></i>
-                                    <span class="font-black tracking-widest uppercase" style="font-size: 8px;">ACTIVA+</span>
-                                </div>
-                                <p>Daniela Contreras & Gabriela Vega</p>
-                            </div>
+                            ${getAuthorFooter(true)}
                         </div>
                     </div>
                 `;
@@ -292,7 +289,7 @@
                                             <i data-lucide="${moduleData[key].icon}" class="w-5 h-5"></i>
                                         </div>
                                         <p class="font-bold text-sm">${moduleData[key].title}</p>
-                                        <p class="text-[9px] text-slate-500 font-bold uppercase">Explorar</p>
+                                        <p class="text-[9px] text-slate-500 font-bold uppercase tracking-tight">Explorar</p>
                                     </button>
                                 `).join('')}
                             </div>
@@ -319,8 +316,14 @@
                         </div>
 
                         <div class="p-6 pb-24">
-                            <div class="video-container mb-8 shadow-2xl border border-white/10 bg-slate-800">
-                                <iframe src="${mod.video}" frameborder="0" allowfullscreen></iframe>
+                            <div class="video-container mb-8 shadow-2xl border border-white/10 bg-black">
+                                <iframe 
+                                    src="${mod.video}" 
+                                    title="Reproductor de Video ACTIVA+" 
+                                    frameborder="0" 
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                    allowfullscreen>
+                                </iframe>
                             </div>
 
                             <h4 class="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Consejos</h4>
@@ -339,6 +342,7 @@
                                     <p class="font-bold text-lg mb-6">${mod.activity}</p>
                                     <button onclick="completeModule('${window.state.currentModule}')" class="w-full bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all uppercase text-xs tracking-widest">Hecho +150 XP</button>
                                 </div>
+                                <i data-lucide="star" class="absolute -right-4 -bottom-4 w-24 h-24 text-white/10 rotate-12"></i>
                             </div>
                             ${getAuthorFooter()}
                         </div>
@@ -348,20 +352,22 @@
 
             else if (window.state.screen === 'weight') {
                 container.innerHTML = `
-                    <div class="flex-1 flex flex-col p-8 overflow-y-auto no-scrollbar">
+                    <div class="flex-1 flex flex-col p-8 overflow-y-auto no-scrollbar pb-32">
                         <button onclick="navigate('home')" class="w-10 h-10 glass-card rounded-full flex items-center justify-center mb-8"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
-                        <h2 class="text-4xl font-black mb-8">Mi Peso</h2>
-                        <div class="glass-card p-10 rounded-[3rem] text-center mb-12 border border-white/5">
+                        <h2 class="text-4xl font-black mb-8 leading-tight">Mi Historial</h2>
+                        <div class="glass-card p-10 rounded-[3rem] text-center mb-12 border border-white/5 relative overflow-hidden">
                             <p class="text-xs font-bold text-slate-500 uppercase mb-4 tracking-widest">Peso Actual</p>
-                            <div class="text-7xl font-black mb-8">${p.weight}<span class="text-xl text-slate-600 ml-1">kg</span></div>
+                            <div class="text-7xl font-black mb-8 flex items-baseline justify-center gap-1">${p.weight}<span class="text-xl text-slate-600">kg</span></div>
                             <div class="flex justify-center gap-6">
-                                <button onclick="changeWeight(-0.5)" class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center text-3xl font-bold shadow-xl active:scale-90">-</button>
-                                <button onclick="changeWeight(0.5)" class="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center text-3xl font-bold shadow-xl active:scale-90">+</button>
+                                <button onclick="changeWeight(-0.5)" class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center text-3xl font-bold shadow-xl active:scale-90 border border-white/5">-</button>
+                                <button onclick="changeWeight(0.5)" class="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center text-3xl font-bold shadow-xl active:scale-90 border border-green-500/50">+</button>
                             </div>
                         </div>
-                        <div class="mt-auto">
-                            ${getAuthorFooter()}
+                        <div class="bg-blue-600/10 border border-blue-500/20 p-6 rounded-3xl mb-12">
+                            <h4 class="font-bold text-blue-400 flex items-center gap-2 mb-2 text-sm"><i data-lucide="info" class="w-4 h-4"></i> Tip de Salud</h4>
+                            <p class="text-sm text-slate-300 italic">"Pésate por la mañana antes de desayunar para obtener el dato más preciso."</p>
                         </div>
+                        ${getAuthorFooter()}
                     </div>
                 `;
             }
@@ -370,10 +376,10 @@
                 container.innerHTML = `
                     <div class="flex-1 flex flex-col p-8 overflow-y-auto no-scrollbar pb-32">
                         <button onclick="navigate('home')" class="w-10 h-10 glass-card rounded-full flex items-center justify-center mb-8"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
-                        <h2 class="text-4xl font-black mb-8">30 Días</h2>
+                        <h2 class="text-4xl font-black mb-8 leading-tight">30 Días<br>Saludables</h2>
                         <div class="grid grid-cols-5 gap-3 mb-12">
                             ${p.calendar.map((done, i) => `
-                                <div class="aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${done ? 'bg-green-600 text-white shadow-lg' : 'glass-card text-slate-600'}">
+                                <div class="aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${done ? 'bg-green-600 text-white shadow-lg' : 'glass-card text-slate-600 border border-white/5'}">
                                     <span class="text-[8px] font-bold">DÍA</span>
                                     <span class="text-lg font-black">${i + 1}</span>
                                     ${done ? '<i data-lucide="check" class="w-3 h-3 mt-1"></i>' : ''}
