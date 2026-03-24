@@ -87,7 +87,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -104,28 +104,37 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'activa-plus-v4';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'activa-plus-v5';
 
         window.state = {
             user: null,
             screen: 'loading',
             error: null,
+            authError: null,
             currentModule: null,
+            expandedTip: null,
             profile: {
-                name: "", weight: 0, targetWeight: 0, xp: 0, level: 1,
+                name: "", email: "", phone: "", dob: "",
+                weight: 0, height: 0, age: 0, idealWeight: 0,
+                xp: 0, level: 1, currentDay: 0,
                 calendar: Array(30).fill(false),
+                plan: [], 
                 completedModules: []
             }
         };
 
-        // URLs de YouTube estándar para máxima compatibilidad
         const moduleData = {
             actividad: {
                 title: "Actividad Física",
                 video: "https://www.youtube.com/embed/40wofiD9p_A",
                 icon: "zap",
                 color: "from-orange-500 to-red-500",
-                tips: ["Mejora la resistencia física.", "Fortalece tus huesos.", "Reduce el estrés.", "Mínimo 60 min al día."],
+                tips: [
+                    { title: "Mejora la resistencia física.", desc: "Realizar ejercicio cardiovascular fortalece tu corazón y pulmones.", apply: "Intenta hacer 20 minutos de trote suave 3 veces por semana." },
+                    { title: "Fortalece tus huesos.", desc: "Actividades de impacto moderado ayudan a aumentar la densidad ósea.", apply: "Incluye 10 minutos de saltos o baloncesto en tu rutina." },
+                    { title: "Reduce el estrés.", desc: "Tu cuerpo libera endorfinas, las hormonas de la felicidad.", apply: "Sal a caminar o baila tus canciones favoritas." },
+                    { title: "Mínimo 60 min al día.", desc: "La OMS recomienda al menos una hora diaria.", apply: "Suma minutos: 20 caminando, 20 en recreo, 20 jugando." }
+                ],
                 activity: "Realiza 20 saltos de tijera ahora mismo."
             },
             comida: {
@@ -133,7 +142,12 @@
                 video: "https://www.youtube.com/embed/bnmUouTftX0",
                 icon: "apple",
                 color: "from-red-500 to-pink-500",
-                tips: ["Plato colorido (arcoíris).", "Evita ultraprocesados.", "Frutas como snack.", "La fibra es tu aliada."],
+                tips: [
+                    { title: "Plato colorido (arcoíris).", desc: "Más colores significan más vitaminas diferentes.", apply: "Incluye vegetales de tres colores en tu almuerzo." },
+                    { title: "Evita ultraprocesados.", desc: "Suelen tener exceso de sodio y azúcar.", apply: "Cambia las papitas de paquete por palomitas caseras." },
+                    { title: "Frutas como snack.", desc: "Te dan energía rápida y natural.", apply: "Lleva siempre una fruta en tu mochila escolar." },
+                    { title: "La fibra es tu aliada.", desc: "Mejora tu digestión y te mantiene lleno.", apply: "Cambia el pan blanco por integral." }
+                ],
                 activity: "Planifica 3 frutas para comer esta semana."
             },
             agua: {
@@ -141,7 +155,12 @@
                 video: "https://www.youtube.com/embed/b7AAHNUTK7U",
                 icon: "droplet",
                 color: "from-blue-500 to-cyan-500",
-                tips: ["Mantiene el cerebro enfocado.", "No esperes a tener sed.", "Evita gaseosas.", "Meta: 8 vasos diarios."],
+                tips: [
+                    { title: "Mantiene el cerebro enfocado.", desc: "La deshidratación causa dolores de cabeza y cansancio.", apply: "Toma un vaso de agua antes de hacer tareas." },
+                    { title: "No esperes a tener sed.", desc: "La sed es una señal tardía de alarma.", apply: "Ten siempre una botella de agua visible." },
+                    { title: "Evita gaseosas y jugos.", desc: "Aportan calorías vacías que no te nutren.", apply: "Reemplázalos por agua con gotas de limón." },
+                    { title: "Meta: 8 vasos diarios.", desc: "Es la cantidad recomendada.", apply: "Usa el calendario de la app para registrar tu progreso." }
+                ],
                 activity: "Toma un vaso de agua natural ahora."
             },
             descanso: {
@@ -149,45 +168,66 @@
                 video: "https://www.youtube.com/embed/LsMUYy8KUbc",
                 icon: "moon",
                 color: "from-purple-500 to-indigo-500",
-                tips: ["Mejora la memoria.", "Apaga pantallas antes de dormir.", "Crecimiento nocturno.", "Duerma 8-10 horas."],
+                tips: [
+                    { title: "Mejora la memoria.", desc: "Tu cerebro organiza lo aprendido mientras duermes.", apply: "Repasa apuntes clave antes de dormir." },
+                    { title: "Apaga pantallas de noche.", desc: "La luz azul engaña a tu cerebro bloqueando el sueño.", apply: "Deja el celular 30 minutos antes de acostarte." },
+                    { title: "Ayuda al crecimiento.", desc: "La hormona del crecimiento se libera al dormir.", apply: "Mantén un horario fijo para dormir." },
+                    { title: "Duerme de 8 a 10 horas.", desc: "Los jóvenes necesitan más sueño por su desarrollo.", apply: "Calcula 9 horas hacia atrás desde tu alarma." }
+                ],
                 activity: "Pon una alarma de 'Desconexión Digital'."
             }
         };
 
-        const init = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+        const init = () => {
+            render(); 
 
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        window.state.user = user;
-                        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
-                        onSnapshot(docRef, (docSnap) => {
-                            if (docSnap.exists()) {
-                                window.state.profile = docSnap.data();
-                                navigate('home');
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    if (user.isAnonymous) {
+                        await signOut(auth);
+                        return;
+                    }
+
+                    window.state.user = user;
+                    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
+                    
+                    onSnapshot(docRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            window.state.profile = { ...window.state.profile, ...docSnap.data() };
+                            
+                            if (window.state.profile.weight > 0) {
+                                // Evitamos redirigir forzosamente si estamos en ai_result para que el usuario pueda leer su plan
+                                if(['loading', 'auth_select', 'login', 'register', 'onboarding'].includes(window.state.screen)) {
+                                    navigate('home');
+                                } else {
+                                    render();
+                                }
                             } else {
+                                if (window.state.screen !== 'onboarding') {
+                                    navigate('onboarding');
+                                }
+                            }
+                        } else {
+                            if (window.state.screen === 'loading') {
                                 navigate('onboarding');
                             }
-                        }, (err) => {
-                            console.error("Error en Firestore:", err);
-                            window.state.error = "Error de acceso a datos.";
-                            render();
-                        });
-                    }
-                });
-            } catch (e) {
-                window.state.error = "Error al conectar con Firebase.";
-                render();
-            }
+                        }
+                    }, (err) => {
+                        console.error("Error en Firestore:", err);
+                        window.state.error = "Error de acceso a datos.";
+                        render();
+                    });
+                } else {
+                    window.state.user = null;
+                    navigate('auth_select');
+                }
+            });
         };
 
         window.navigate = (screen, params = null) => {
             window.state.screen = screen;
+            window.state.authError = null; 
+            window.state.expandedTip = null; 
             if (params) window.state.currentModule = params;
             render();
         };
@@ -195,7 +235,116 @@
         window.saveProfile = async (data) => {
             if (!window.state.user) return;
             const newProfile = { ...window.state.profile, ...data };
+            window.state.profile = newProfile; // Actualización local inmediata para la UI
             await setDoc(doc(db, 'artifacts', appId, 'users', window.state.user.uid, 'data', 'profile'), newProfile);
+        };
+
+        // --- SISTEMA DE INTELIGENCIA ARTIFICIAL (Lógica) ---
+        
+        const generarPlanIA = (age, weight, idealWeight) => {
+            const isCardioFocus = weight > idealWeight;
+            const plan = [];
+            const baseTasks = [
+                "Bebe 2 litros de agua hoy, sin excusas.",
+                "Evita el azúcar añadido en todas tus bebidas.",
+                "Duerme al menos 8 horas esta noche.",
+                "Come una fruta con el desayuno.",
+                "Haz 10 minutos de estiramiento.",
+                isCardioFocus ? "Realiza 20 minutos de caminata rápida." : "Haz 15 sentadillas y 10 flexiones.",
+                "Desconéctate de las pantallas 1 hora antes de dormir.",
+                "Incluye vegetales verdes en tu almuerzo.",
+                "Baila 3 canciones seguidas para activarte.",
+                isCardioFocus ? "Sube y baja escaleras por 5 minutos." : "Practica planchas (planks) por 1 minuto.",
+                "Bebe un vaso de agua al despertar.",
+                "Mastica tu comida lentamente, disfruta cada bocado.",
+                "Lee un libro por 15 minutos antes de dormir.",
+                isCardioFocus ? "Haz 30 saltos de tijera (Jumping Jacks)." : "Haz 20 zancadas (lunges) en total.",
+                "Hoy no consumas comida chatarra ni paquetes.",
+                "Respira profundamente por 3 minutos si sientes estrés.",
+                "Toma agua en lugar de jugo con tu almuerzo.",
+                "Acuéstate 30 minutos más temprano hoy.",
+                "Prueba una verdura que casi nunca comes.",
+                isCardioFocus ? "Trota en el mismo lugar por 3 minutos." : "Haz 15 abdominales.",
+                "Asegúrate de desayunar proteína (huevo, queso, etc).",
+                "Evita usar el celular mientras comes.",
+                "Sonríe frente al espejo por 1 minuto, ¡activa endorfinas!",
+                "Camina mientras hablas por teléfono.",
+                "Cena ligero, al menos 2 horas antes de dormir.",
+                isCardioFocus ? "Realiza una rutina rápida de cardio de 10 min." : "Haz ejercicios de fuerza por 10 min.",
+                "Hoy bebe 8 vasos de agua completos.",
+                "Come 2 porciones de fruta durante el día.",
+                "Haz un repaso mental de lo bueno de hoy antes de dormir.",
+                "¡Día 30! Pésate y celebra tus nuevos hábitos."
+            ];
+            return baseTasks;
+        };
+
+        // --- FUNCIONES DE AUTENTICACIÓN ---
+
+        window.handleRegister = async () => {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const phone = document.getElementById('reg-phone').value;
+            const dob = document.getElementById('reg-dob').value;
+            const password = document.getElementById('reg-password').value;
+
+            if (!name || !email || !phone || !dob || !password) {
+                window.state.authError = "Por favor, completa todos los campos.";
+                render();
+                return;
+            }
+
+            try {
+                window.state.screen = 'loading';
+                render();
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                
+                const initialProfile = {
+                    name, email, phone, dob,
+                    weight: 0, height: 0, age: 0, idealWeight: 0,
+                    xp: 0, level: 1, currentDay: 0,
+                    calendar: Array(30).fill(false),
+                    plan: [],
+                    completedModules: []
+                };
+                
+                await setDoc(doc(db, 'artifacts', appId, 'users', userCredential.user.uid, 'data', 'profile'), initialProfile);
+                window.state.profile = initialProfile;
+            } catch (error) {
+                window.state.screen = 'register';
+                let msg = error.message;
+                if (msg.includes("email-already-in-use")) msg = "Este correo ya está registrado.";
+                if (msg.includes("weak-password")) msg = "La contraseña debe tener al menos 6 caracteres.";
+                if (msg.includes("invalid-email")) msg = "El formato del correo es inválido.";
+                window.state.authError = msg;
+                render();
+            }
+        };
+
+        window.handleLogin = async () => {
+            const email = document.getElementById('log-email').value;
+            const password = document.getElementById('log-password').value;
+            if (!email || !password) {
+                window.state.authError = "Ingresa tu correo y contraseña."; render(); return;
+            }
+            try {
+                window.state.screen = 'loading'; render();
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                window.state.screen = 'login';
+                window.state.authError = "Credenciales incorrectas o usuario no encontrado.";
+                render();
+            }
+        };
+
+        window.handleLogout = async () => {
+            try { window.state.screen = 'loading'; render(); await signOut(auth); } 
+            catch (error) { console.error(error); }
+        };
+
+        window.toggleTip = (index) => {
+            window.state.expandedTip = window.state.expandedTip === index ? null : index;
+            render();
         };
 
         const getAuthorFooter = (isLight = false) => `
@@ -233,9 +382,79 @@
                         <div class="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden mb-12">
                             <div class="h-full bg-green-500 animate-progress"></div>
                         </div>
-                        <div class="absolute bottom-4 w-full">
-                            ${getAuthorFooter()}
+                        <div class="absolute bottom-4 w-full">${getAuthorFooter()}</div>
+                    </div>
+                `;
+            }
+
+            else if (window.state.screen === 'auth_select') {
+                container.innerHTML = `
+                    <div class="flex-1 flex flex-col p-8 items-center justify-center bg-slate-900 text-center relative">
+                        <div class="w-28 h-28 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl mb-8 module-animate">
+                            <i data-lucide="activity" class="text-green-500 w-14 h-14"></i>
                         </div>
+                        <h1 class="text-5xl font-black mb-2 tracking-tighter uppercase text-white module-animate">ACTIVA+</h1>
+                        <p class="text-slate-400 mb-12 module-animate">Level up your health</p>
+                        
+                        <div class="w-full space-y-4 module-animate">
+                            <button onclick="navigate('login')" class="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all text-lg">
+                                INICIAR SESIÓN
+                            </button>
+                            <button onclick="navigate('register')" class="w-full bg-transparent border-2 border-slate-700 hover:border-slate-500 text-white font-black py-4 rounded-2xl active:scale-95 transition-all text-lg">
+                                CREAR CUENTA
+                            </button>
+                        </div>
+                        <div class="absolute bottom-4 w-full left-0">${getAuthorFooter()}</div>
+                    </div>
+                `;
+            }
+
+            else if (window.state.screen === 'login') {
+                container.innerHTML = `
+                    <div class="flex-1 flex flex-col p-8 bg-slate-900 overflow-y-auto no-scrollbar relative module-animate">
+                        <button onclick="navigate('auth_select')" class="absolute top-8 left-8 text-white glass-card p-2 rounded-full"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+                        <h2 class="text-3xl font-black mt-20 mb-2 text-center">Bienvenido</h2>
+                        <p class="text-slate-400 text-center mb-8">Ingresa tus datos para continuar</p>
+                        ${window.state.authError ? `<div class="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-xl mb-6 text-sm text-center font-bold">${window.state.authError}</div>` : ''}
+                        <div class="space-y-4 mb-8">
+                            <input id="log-email" type="email" placeholder="Correo electrónico" class="w-full p-4 bg-slate-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-white placeholder-slate-500">
+                            <input id="log-password" type="password" placeholder="Contraseña" class="w-full p-4 bg-slate-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-white placeholder-slate-500">
+                        </div>
+                        <button onclick="handleLogin()" class="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all">ENTRAR</button>
+                    </div>
+                `;
+            }
+
+            else if (window.state.screen === 'register') {
+                container.innerHTML = `
+                    <div class="flex-1 flex flex-col p-8 bg-slate-900 overflow-y-auto no-scrollbar relative module-animate">
+                        <button onclick="navigate('auth_select')" class="absolute top-8 left-8 text-white glass-card p-2 rounded-full"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+                        <h2 class="text-3xl font-black mt-20 mb-2">Crear Cuenta</h2>
+                        <p class="text-slate-400 mb-6 text-sm">Regístrate para guardar tu progreso.</p>
+                        ${window.state.authError ? `<div class="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-xl mb-4 text-sm font-bold">${window.state.authError}</div>` : ''}
+                        <div class="space-y-4 mb-8">
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-2">Nombre Completo</label>
+                                <input id="reg-name" type="text" placeholder="Ej. Juan Pérez" class="mt-1 w-full p-4 bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-white">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-2">Correo Electrónico</label>
+                                <input id="reg-email" type="email" placeholder="tucorreo@email.com" class="mt-1 w-full p-4 bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-white">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-2">Teléfono</label>
+                                <input id="reg-phone" type="tel" placeholder="Tu número celular" class="mt-1 w-full p-4 bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-white">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-2">Fecha de Nacimiento</label>
+                                <input id="reg-dob" type="date" class="mt-1 w-full p-4 bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-white [color-scheme:dark]">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-2">Contraseña (Mínimo 6)</label>
+                                <input id="reg-password" type="password" placeholder="Crea una contraseña segura" class="mt-1 w-full p-4 bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-white">
+                            </div>
+                        </div>
+                        <button onclick="handleRegister()" class="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all mb-8">REGISTRARSE</button>
                     </div>
                 `;
             }
@@ -243,53 +462,112 @@
             else if (window.state.screen === 'onboarding') {
                 container.innerHTML = `
                     <div class="flex-1 flex flex-col p-8 bg-white text-slate-900 overflow-y-auto no-scrollbar">
-                        <h2 class="text-4xl font-black mb-2 leading-tight">¡Hola!<br>Explorador</h2>
-                        <p class="text-slate-500 mb-8 font-medium">Hagamos tu diagnóstico inicial de salud.</p>
+                        <h2 class="text-4xl font-black mb-2 leading-tight">Ya casi,<br>${p.name.split(' ')[0]}!</h2>
+                        <p class="text-slate-500 mb-8 font-medium">La IA necesita algunos datos para calcular tu peso ideal y crear tu plan.</p>
+                        
                         <div class="space-y-6 mb-12">
-                            <input id="ob-name" type="text" placeholder="¿Cómo te llamas?" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-green-500">
+                            <div>
+                                <label class="text-xs font-bold text-slate-400 uppercase">Tu Edad (Años)</label>
+                                <input id="ob-age" type="number" placeholder="Ej. 12" class="mt-2 w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-blue-500">
+                            </div>
                             <div class="flex gap-4">
-                                <input id="ob-weight" type="number" placeholder="Peso kg" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-green-500">
-                                <input id="ob-target" type="number" placeholder="Meta kg" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-green-500">
+                                <div class="flex-1">
+                                    <label class="text-xs font-bold text-slate-400 uppercase">Peso actual (kg)</label>
+                                    <input id="ob-weight" type="number" placeholder="Ej. 45" class="mt-2 w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-blue-500">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="text-xs font-bold text-slate-400 uppercase">Estatura (cm)</label>
+                                    <input id="ob-height" type="number" placeholder="Ej. 150" class="mt-2 w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-blue-500">
+                                </div>
                             </div>
                         </div>
-                        <button onclick="handleStart()" class="w-full bg-green-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-green-600/20 active:scale-95 transition-all">COMENZAR AVENTURA</button>
-                        <div class="mt-8">
-                            ${getAuthorFooter(true)}
+                        <button onclick="handleStart()" class="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-600/20 active:scale-95 transition-all flex justify-center items-center gap-2">
+                            <i data-lucide="cpu" class="w-5 h-5"></i> GENERAR PLAN CON IA
+                        </button>
+                        <div class="mt-8">${getAuthorFooter(true)}</div>
+                    </div>
+                `;
+            }
+
+            else if (window.state.screen === 'ai_result') {
+                container.innerHTML = `
+                    <div class="flex-1 flex flex-col p-8 bg-slate-900 overflow-y-auto no-scrollbar module-animate text-center justify-center">
+                        <div class="w-24 h-24 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <i data-lucide="sparkles" class="w-12 h-12"></i>
                         </div>
+                        <h2 class="text-3xl font-black mb-4">Plan Creado</h2>
+                        <p class="text-slate-400 mb-8">Nuestra IA ha analizado tus datos y calculado tu perfil de salud.</p>
+                        
+                        <div class="glass-card p-6 rounded-3xl mb-8 text-left border border-blue-500/30 bg-blue-500/10">
+                            <p class="text-xs font-bold text-blue-400 uppercase mb-2">Análisis de IA</p>
+                            <p class="text-lg font-bold mb-2">Tu peso ideal es: <span class="text-blue-400">${p.idealWeight} kg</span></p>
+                            <p class="text-sm text-slate-300">Hemos diseñado 30 retos diarios para ayudarte a ${p.weight > p.idealWeight ? 'alcanzar tu meta' : 'mantenerte fuerte y saludable'}.</p>
+                        </div>
+
+                        <button onclick="navigate('home')" class="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all">
+                            VER MI PRIMER RETO
+                        </button>
                     </div>
                 `;
             }
 
             else if (window.state.screen === 'home') {
+                const isPlanFinished = p.currentDay >= 30;
                 container.innerHTML = `
                     <div class="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-32">
                         <header class="p-6">
                             <div class="flex justify-between items-center mb-8">
                                 <div class="flex items-center gap-3">
                                     <div class="w-12 h-12 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-full flex items-center justify-center font-bold text-slate-900 shadow-lg">LV ${p.level}</div>
-                                    <p class="text-xl font-black">${p.name}</p>
+                                    <p class="text-xl font-black">${p.name.split(' ')[0]}</p>
                                 </div>
-                                <button onclick="navigate('weight')" class="glass-card px-4 py-2 rounded-xl flex items-center gap-2"><i data-lucide="scale" class="w-4 h-4 text-blue-400"></i><span class="font-bold text-sm">${p.weight}kg</span></button>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="navigate('weight')" class="glass-card px-4 py-2 rounded-xl flex items-center gap-2 text-white">
+                                        <i data-lucide="scale" class="w-4 h-4 text-blue-400"></i><span class="font-bold text-sm">${p.weight}kg</span>
+                                    </button>
+                                    <button onclick="handleLogout()" class="glass-card px-3 py-2 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors" title="Cerrar sesión">
+                                        <i data-lucide="power" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="bg-gradient-to-br from-green-500 to-emerald-700 p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden mb-8">
+                            
+                            <div class="bg-gradient-to-br from-blue-600 to-indigo-800 p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden mb-8 border border-white/10">
                                 <div class="relative z-10">
-                                    <p class="text-white/80 text-[10px] font-bold uppercase mb-1">Misión de Hoy</p>
-                                    <h3 class="text-xl font-bold mb-4">Hidratación Total</h3>
-                                    <button onclick="navigate('calendar')" class="bg-white/20 text-white text-[10px] font-black py-2 px-4 rounded-full uppercase border border-white/10">Mi Plan 30 Días</button>
+                                    ${!isPlanFinished ? `
+                                        <div class="flex items-center gap-2 mb-2 text-blue-200">
+                                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                            <p class="text-[10px] font-bold uppercase tracking-wider">Misión ${p.currentDay + 1} de 30</p>
+                                        </div>
+                                        <h3 class="text-xl font-bold mb-6 leading-tight text-white">${p.plan[p.currentDay] || 'Cargando reto...'}</h3>
+                                        
+                                        ${!p.calendar[p.currentDay] ? 
+                                            `<button onclick="completeDailyMission()" class="w-full bg-green-500 hover:bg-green-400 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all text-sm flex justify-center items-center gap-2">
+                                                ¿Cumpliste la meta de hoy? ¡SÍ! <i data-lucide="check-circle" class="w-5 h-5"></i>
+                                            </button>` 
+                                            : 
+                                            `<div class="w-full bg-white/10 text-green-400 font-black py-4 rounded-xl text-sm flex justify-center items-center gap-2 border border-green-400/30">
+                                                <i data-lucide="check" class="w-5 h-5"></i> Meta Cumplida
+                                            </div>`
+                                        }
+                                    ` : `
+                                        <h3 class="text-xl font-bold mb-2">¡Plan Completado!</h3>
+                                        <p class="text-sm text-blue-200 mb-4">Has terminado tus 30 días de hábitos saludables.</p>
+                                        <button onclick="navigate('calendar')" class="w-full bg-white text-indigo-900 font-black py-3 rounded-xl">Ver Calendario</button>
+                                    `}
                                 </div>
-                                <i data-lucide="zap" class="absolute -right-6 -bottom-6 w-32 h-32 text-white/10 rotate-12"></i>
+                                <i data-lucide="cpu" class="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 rotate-12"></i>
                             </div>
                         </header>
                         <section class="px-6 mb-8">
-                            <h4 class="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Módulos</h4>
+                            <h4 class="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Módulos de Estudio</h4>
                             <div class="grid grid-cols-2 gap-4">
                                 ${Object.keys(moduleData).map(key => `
-                                    <button onclick="navigate('learning', '${key}')" class="glass-card p-5 rounded-[2rem] text-left active:scale-95 transition-all border border-white/5">
+                                    <button onclick="navigate('learning', '${key}')" class="glass-card p-5 rounded-[2rem] text-left active:scale-95 transition-all border border-white/5 hover:bg-white/5">
                                         <div class="w-10 h-10 bg-gradient-to-br ${moduleData[key].color} rounded-xl flex items-center justify-center mb-3 shadow-lg">
                                             <i data-lucide="${moduleData[key].icon}" class="w-5 h-5"></i>
                                         </div>
                                         <p class="font-bold text-sm">${moduleData[key].title}</p>
-                                        <p class="text-[9px] text-slate-500 font-bold uppercase tracking-tight">Explorar</p>
+                                        <p class="text-[9px] text-slate-500 font-bold uppercase tracking-tight mt-1">Explorar</p>
                                     </button>
                                 `).join('')}
                             </div>
@@ -326,14 +604,32 @@
                                 </iframe>
                             </div>
 
-                            <h4 class="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Consejos</h4>
+                            <h4 class="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Consejos Educativos</h4>
                             <div class="space-y-3 mb-8">
-                                ${mod.tips.map(tip => `
-                                    <div class="glass-card p-4 rounded-2xl flex items-center gap-4 border border-white/5">
-                                        <div class="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_#22c55e]"></div>
-                                        <p class="text-sm text-slate-200">${tip}</p>
+                                ${mod.tips.map((tip, index) => {
+                                    const isExpanded = window.state.expandedTip === index;
+                                    return `
+                                    <div class="glass-card rounded-2xl border border-white/5 overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-slate-800' : ''}">
+                                        <button onclick="toggleTip(${index})" class="w-full p-4 flex items-center justify-between text-left active:bg-white/5">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-2 h-2 ${isExpanded ? 'bg-green-400' : 'bg-green-500'} rounded-full shadow-[0_0_8px_#22c55e]"></div>
+                                                <p class="text-sm font-bold ${isExpanded ? 'text-green-400' : 'text-slate-200'}">${tip.title}</p>
+                                            </div>
+                                            <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-5 h-5 ${isExpanded ? 'text-green-400' : 'text-slate-400'}"></i>
+                                        </button>
+                                        
+                                        ${isExpanded ? `
+                                            <div class="px-4 pb-5 pt-1 border-t border-white/5">
+                                                <p class="text-sm text-slate-300 mb-3 leading-relaxed">${tip.desc}</p>
+                                                <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                                                    <p class="text-[10px] font-black uppercase text-green-500 mb-1 flex items-center gap-1"><i data-lucide="target" class="w-3 h-3"></i> ¿Cómo aplicarlo?</p>
+                                                    <p class="text-xs text-slate-200">${tip.apply}</p>
+                                                </div>
+                                            </div>
+                                        ` : ''}
                                     </div>
-                                `).join('')}
+                                    `;
+                                }).join('')}
                             </div>
 
                             <div class="bg-gradient-to-br ${mod.color} p-6 rounded-[2rem] shadow-xl relative overflow-hidden mb-8">
@@ -355,7 +651,8 @@
                     <div class="flex-1 flex flex-col p-8 overflow-y-auto no-scrollbar pb-32">
                         <button onclick="navigate('home')" class="w-10 h-10 glass-card rounded-full flex items-center justify-center mb-8"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
                         <h2 class="text-4xl font-black mb-8 leading-tight">Mi Historial</h2>
-                        <div class="glass-card p-10 rounded-[3rem] text-center mb-12 border border-white/5 relative overflow-hidden">
+                        
+                        <div class="glass-card p-10 rounded-[3rem] text-center mb-6 border border-white/5 relative overflow-hidden">
                             <p class="text-xs font-bold text-slate-500 uppercase mb-4 tracking-widest">Peso Actual</p>
                             <div class="text-7xl font-black mb-8 flex items-baseline justify-center gap-1">${p.weight}<span class="text-xl text-slate-600">kg</span></div>
                             <div class="flex justify-center gap-6">
@@ -363,9 +660,13 @@
                                 <button onclick="changeWeight(0.5)" class="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center text-3xl font-bold shadow-xl active:scale-90 border border-green-500/50">+</button>
                             </div>
                         </div>
+
                         <div class="bg-blue-600/10 border border-blue-500/20 p-6 rounded-3xl mb-12">
-                            <h4 class="font-bold text-blue-400 flex items-center gap-2 mb-2 text-sm"><i data-lucide="info" class="w-4 h-4"></i> Tip de Salud</h4>
-                            <p class="text-sm text-slate-300 italic">"Pésate por la mañana antes de desayunar para obtener el dato más preciso."</p>
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-bold text-blue-400 flex items-center gap-2 text-sm"><i data-lucide="cpu" class="w-4 h-4"></i> Peso Ideal (IA)</h4>
+                                <span class="bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-lg">${p.idealWeight} kg</span>
+                            </div>
+                            <p class="text-sm text-slate-300 italic mt-3">"Este peso es un cálculo aproximado basado en tu edad (${p.age} años) y estatura. Sigue tus retos diarios para mantenerte saludable."</p>
                         </div>
                         ${getAuthorFooter()}
                     </div>
@@ -379,10 +680,10 @@
                         <h2 class="text-4xl font-black mb-8 leading-tight">30 Días<br>Saludables</h2>
                         <div class="grid grid-cols-5 gap-3 mb-12">
                             ${p.calendar.map((done, i) => `
-                                <div class="aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${done ? 'bg-green-600 text-white shadow-lg' : 'glass-card text-slate-600 border border-white/5'}">
-                                    <span class="text-[8px] font-bold">DÍA</span>
+                                <div class="aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${done ? 'bg-green-600 text-white shadow-lg shadow-green-500/30' : 'glass-card text-slate-600 border border-white/5'}">
+                                    <span class="text-[8px] font-bold ${done ? 'text-green-200' : ''}">DÍA</span>
                                     <span class="text-lg font-black">${i + 1}</span>
-                                    ${done ? '<i data-lucide="check" class="w-3 h-3 mt-1"></i>' : ''}
+                                    ${done ? '<i data-lucide="check" class="w-4 h-4 mt-1 text-white"></i>' : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -394,11 +695,50 @@
             lucide.createIcons();
         };
 
+        // --- ACCIONES DE USUARIO ---
+
         window.handleStart = () => {
-            const name = document.getElementById('ob-name').value;
+            const age = parseInt(document.getElementById('ob-age').value);
             const weight = parseFloat(document.getElementById('ob-weight').value);
-            const target = parseFloat(document.getElementById('ob-target').value);
-            if (name && weight) window.saveProfile({ name, weight, targetWeight: target || weight - 2 });
+            let height = parseFloat(document.getElementById('ob-height').value);
+            
+            if (age && weight && height) {
+                // Corrección por si el usuario ingresa la altura en metros (ej. 1.50 en lugar de 150)
+                if (height < 3) {
+                    height = height * 100;
+                }
+
+                // Cálculo de Peso Ideal aproximado (IMC 21 promedio para adolescentes/jóvenes)
+                const heightMeters = height / 100;
+                let idealWeight = 21 * (heightMeters * heightMeters);
+                idealWeight = Math.round(idealWeight * 10) / 10; // Redondear a 1 decimal
+
+                const plan = generarPlanIA(age, weight, idealWeight);
+
+                window.saveProfile({ 
+                    age, 
+                    weight, 
+                    height, 
+                    idealWeight,
+                    plan
+                }).then(() => {
+                    navigate('ai_result');
+                });
+            }
+        };
+
+        window.completeDailyMission = () => {
+            let { xp, level, calendar, currentDay } = window.state.profile;
+            calendar[currentDay] = true;
+            xp += 100;
+            if (xp >= 500) { xp = 0; level++; }
+            
+            // Avanzar al siguiente día
+            if (currentDay < 29) {
+                currentDay++;
+            }
+            
+            window.saveProfile({ xp, level, calendar, currentDay });
         };
 
         window.changeWeight = (val) => {
